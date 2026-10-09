@@ -36,7 +36,7 @@ assert skus == {"1", "2"}, skus
 assert next(d for d in due if d["sku"] == "1")["cadence"] == 14
 assert order_cadence(orders) == 14
 report = due_report(orders, NOW)
-assert "Regulars due (1): Kefir" in report and "Occasional items due (1):" in report and "Detergent" in report, report
+assert "Regulars due (1): Kefir" in report and "[1] Kefir" in due_report(orders, NOW, full=True) and "Occasional items due (1):" in report and "Detergent" in report, report
 assert due_report([], NOW).startswith("No delivered orders")
 
 assert _suggest_keyword("KOZJI SIR ZGO, V REZINAH, 100G") == "kozji sir"

@@ -26,6 +26,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -146,8 +147,8 @@ def compute_due(orders: list[dict], today: datetime, horizon_days: int = 7, min_
     return due
 
 
-def due_report(orders: list[dict], today: datetime, horizon_days: int = 7) -> str:
-    """Short human/Telegram-friendly summary of what is running low."""
+def due_report(orders: list[dict], today: datetime, horizon_days: int = 7, full: bool = False) -> str:
+    """Summary of what is running low; `full` lists every regular (terminal), else condensed (Telegram)."""
     dates = _delivery_dates(orders)
     if not dates:
         return "No delivered orders yet — nothing to base a reorder on."
@@ -163,7 +164,11 @@ def due_report(orders: list[dict], today: datetime, horizon_days: int = 7) -> st
     split = 1.5 * oc if oc else float("inf")
     regular = [d for d in due if d["cadence"] <= split]
     occasional = [d for d in due if d["cadence"] > split]
-    if regular:
+    if regular and full:
+        lines.append(f"Regulars due ({len(regular)}):")
+        for d in regular:
+            lines.append(f"  [{d['sku']}] {_short(d['name'])} — every ~{d['cadence']:.0f}d, last {d['since']}d ago")
+    elif regular:
         names = [_short(d["name"]) for d in regular]
         more = f" (+{len(names) - 8} more)" if len(names) > 8 else ""
         lines.append(f"Regulars due ({len(regular)}): " + ", ".join(names[:8]) + more)
@@ -184,9 +189,10 @@ def send_telegram(text: str) -> None:
         fields["message_thread_id"] = os.environ["TELEGRAM_THREAD_ID"]
     req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage",
                                  data=urllib.parse.urlencode(fields).encode())
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        if resp.status != 200:
-            raise SystemExit(f"Telegram send failed: HTTP {resp.status}")
+    try:
+        urllib.request.urlopen(req, timeout=30)
+    except urllib.error.URLError as e:
+        raise SystemExit(f"Telegram send failed: {e}")
 
 
 def load_state() -> dict:
@@ -222,14 +228,24 @@ async def get_client(force_login: bool = False) -> SparClient:
     return client
 
 
-async def ensure_cart(client: SparClient):
-    """Make sure client.cart_id points at the active delivery cart and persist it."""
-    if not client.cart_id:
-        await client.get_active_cart()
+async def ensure_cart(client: SparClient) -> dict:
+    """Return the current cart, recovering from a stale cart id in .state.json.
+
+    The saved cart id goes stale when the cart was purchased on the website or
+    expired; then we fall back to the account's active delivery cart.
+    """
+    cart = None
     if client.cart_id:
-        state = load_state()
-        state["cart_id"] = client.cart_id
-        save_state(state)
+        try:
+            cart = await client.get_cart()
+        except Exception:
+            client.cart_id = None
+    if cart is None:
+        cart = await client.get_active_cart()
+    state = load_state()
+    state["cart_id"] = client.cart_id
+    save_state(state)
+    return cart
 
 
 async def default_address_id(client: SparClient) -> str:
@@ -253,13 +269,9 @@ def print_cart_lines(cart: dict):
 async def cmd_login():
     client = await get_client(force_login=True)
     try:
-        await ensure_cart(client)
-        if client.cart_id:
-            cart = await client.get_cart()
-            total = cart.get("pricesSummary", {}).get("total", 0)
-            print(f"Logged in. Cart: {client.cart_id} ({len(cart.get('products', []))} items, {total:.2f} EUR)")
-        else:
-            print("Logged in. No active cart.")
+        cart = await ensure_cart(client)
+        total = cart.get("pricesSummary", {}).get("total", 0)
+        print(f"Logged in. Cart: {client.cart_id} ({len(cart.get('products', []))} items, {total:.2f} EUR)")
     finally:
         await client.close()
 
@@ -291,11 +303,7 @@ async def cmd_search(query: str):
 async def cmd_cart(suggest: bool = False):
     client = await get_client()
     try:
-        await ensure_cart(client)
-        if not client.cart_id:
-            print("No active cart. Add something first.")
-            return
-        cart = await client.get_cart()
+        cart = await ensure_cart(client)
         products = cart.get("products", [])
         summary = cart.get("pricesSummary", {})
 
@@ -521,10 +529,10 @@ async def cmd_due(telegram: bool = False, horizon_days: int = 7):
         orders = await client.get_orders()
     finally:
         await client.close()
-    text = due_report(orders, datetime.now(timezone.utc), horizon_days)
-    print(text)
+    now = datetime.now(timezone.utc)
+    print(due_report(orders, now, horizon_days, full=True))
     if telegram:
-        send_telegram(text + "\n\nTo order: open Claude Code and say \"order groceries\".")
+        send_telegram(due_report(orders, now, horizon_days) + "\n\nTo order: open Claude Code and say \"order groceries\".")
         print("\n(sent to Telegram)")
 
 

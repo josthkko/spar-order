@@ -24,7 +24,7 @@ when something breaks or you want to add a command.
 - **Cart mutations**: `AddProductToEcommerceCart`, bulk
   `AddProductsToEcommerceCart`, `updateProductInEcommerceCart` (quantity;
   adding an existing line errors with `PRODUCT_IN_CART_ALREADY_EXISTS`),
-  `removeProductFromEcommerceCart`.
+  `deleteProductInEcommerceCart`.
 - **Order lines** carry a `type`: `DEFAULT` products, `BAG`/`PACKAGE`
   server-managed packaging, `SAMPLE` free samples. Filter the last three when
   reordering.

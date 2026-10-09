@@ -519,13 +519,18 @@ class SparClient:
                 }
             })
             cart = data["getActiveEcommerceCart"]
+            if not cart:
+                raise Exception("NOT_FOUND")
             self.cart_id = cart["id"]
             return cart
         except Exception as e:
-            if "NOT_FOUND" in str(e) or "null" in str(e):
-                # No active cart, create one
-                return await self.create_cart(operational_model)
-            raise
+            if "NOT_FOUND" not in str(e) and "null" not in str(e):
+                raise
+        try:
+            return await self.create_cart(operational_model)
+        except Exception as e:
+            raise SystemExit("No active delivery cart and the API would not create one "
+                             f"({e}). Add any item to the cart on online.spar.si, then retry.")
 
     async def get_cart(self) -> dict:
         """Get cart by ID, or fetch active delivery cart.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the CLI with the skill's own venv if one exists, else the system python3.
 set -e
-dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+dir="$(cd "$(dirname "$0")" && pwd)"
 py="$dir/.venv/bin/python3"
 [ -x "$py" ] || py=python3
 exec "$py" "$dir/spar_order.py" "$@"

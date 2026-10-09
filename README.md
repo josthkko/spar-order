@@ -18,7 +18,7 @@ claude: Last order was 16 days ago. Due: kefir, eggs, milk, kombucha…
         [AskUserQuestion: delivery Tue 10–12 / Tue 16–18 / Wed 08–10]
         Final cart, 31 lines, 118.40 EUR, free shipping. Place it?
 you:    yes
-claude: Order 87TMR7C87R placed, Tue 10:00–12:00, pay the driver by card.
+claude: Order 87ABCD1234 placed, Tue 10:00–12:00, pay the driver by card.
 ```
 
 ## Install
@@ -31,6 +31,9 @@ cp .env.example .env                                                  # then edi
 ./spar login
 ./spar addresses                                                      # copy your address id into .env
 ```
+
+If `./spar login` reports no active delivery cart, add any item to the cart on
+online.spar.si once (the API cannot create a delivery cart itself) and retry.
 
 The `spar` wrapper uses `.venv` when it exists, otherwise the system `python3`
 (which needs `aiohttp` installed). Python 3.11+.
