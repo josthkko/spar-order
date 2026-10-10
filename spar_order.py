@@ -328,10 +328,10 @@ async def cmd_cart(suggest: bool = False):
             print(f"  {p['unitQuantity']}x {p['name']} — {p['price']['total']:.2f} EUR  [id: {p['id']}]{tag}")
             if not available:
                 out_of_stock.append(p)
-        print(f"\nSubtotal: {summary.get('subtotal', 0):.2f} EUR")
+        ps = summary.get("productsSummary", {})
+        print(f"\nProducts: {ps.get('productsTotal', summary.get('total', 0)):.2f} EUR (incl. VAT)")
         print(f"Shipping: {summary.get('shippingFee', 0):.2f} EUR")
         print(f"Total: {summary.get('total', 0):.2f} EUR")
-        ps = summary.get("productsSummary", {})
         if ps.get("missingForMinimumOrderValue", 0) > 0:
             print(f"Missing for minimum order: {ps['missingForMinimumOrderValue']:.2f} EUR")
         if ps.get("missingForFreeShipping", 0) > 0:
